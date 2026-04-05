@@ -1,14 +1,14 @@
--- [[ CJ Optimizer - SMART & SAFE VERSION ]] --
+-- [[ CJ Optimizer - ABSOLUTE PRECISION MODE ]] --
 _G.CJ_Optimizer = {}
 
 local originalData = {}
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 
--- Daftar folder yang akan dihilangkan VISUALNYA saja (Tabrakan tetap ada)
+-- Folder Target Hasil Scan
 local heavyFolders = {"HUTAN", "Object", "BOOTH", "Screen", "StageLamp"}
 
--- Fungsi cek apakah ini bagian dari Player (Baju, Rambut, Kulit)
+-- Fungsi Proteksi Avatar
 local function isPlayer(v)
     if v:FindFirstAncestorOfClass("Humanoid") or 
        v:FindFirstAncestorOfClass("Accessory") or 
@@ -21,65 +21,76 @@ end
 
 function _G.CJ_Optimizer:Toggle(state)
     if state then
-        -- 1. LIGHTING (Tetap Malam tapi lebih terang sedikit agar tidak suram)
+        -- 1. LIGHTING & ATMOSPHERE
         Lighting.GlobalShadows = false
         Lighting.ClockTime = 0
         Lighting.Brightness = 1
         Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
 
-        -- 2. SEMBUNYIKAN FOLDER BERAT (TANPA TEMBUS TEMBOK)
+        -- 2. PEMBERSIHAN TARGET SPESIFIK (Hutan, Mirror, Sawah, StageLamp)
         for _, name in pairs(heavyFolders) do
             local folder = Workspace:FindFirstChild(name)
             if folder then
-                for _, part in pairs(folder:GetDescendants()) do
-                    if part:IsA("BasePart") or part:IsA("MeshPart") then
-                        -- Simpan data asli
-                        originalData[part] = {Transparency = part.Transparency}
-                        -- Bikin transparan (GPU tidak render, tapi Kaki tetap bisa menabrak)
-                        part.Transparency = 1 
-                    elseif part:IsA("Decal") or part:IsA("Texture") then
-                        originalData[part] = {Transparency = part.Transparency}
-                        part.Transparency = 1
-                    elseif part:IsA("Light") or part:IsA("ParticleEmitter") then
-                        part.Enabled = false
+                for _, obj in pairs(folder:GetDescendants()) do
+                    -- Sembunyikan Part & MeshPart (Termasuk Trunk, MonitorPart2, dan Am)
+                    if obj:IsA("BasePart") or obj:IsA("MeshPart") then
+                        originalData[obj] = {
+                            Transparency = obj.Transparency,
+                            Material = obj.Material
+                        }
+                        obj.Transparency = 1 -- Visual Hilang
+                        obj.Material = Enum.Material.SmoothPlastic
+                        
+                        -- Kosongkan Tekstur Mesh (Penting untuk Trunk dan Lampu Stage)
+                        if obj:IsA("MeshPart") then
+                            obj.TextureID = ""
+                        end
+                    
+                    -- Matikan Mirror/Layar & GUI
+                    elseif obj:IsA("SurfaceGui") or obj:IsA("BillboardGui") or obj:IsA("ViewportFrame") then
+                        obj.Enabled = false
+                        
+                    -- Matikan Lampu & Partikel
+                    elseif obj:IsA("Light") or obj:IsA("ParticleEmitter") then
+                        obj.Enabled = false
                     end
                 end
             end
         end
 
-        -- 3. OPTIMASI SISANYA (SANGAT HATI-HATI)
+        -- 3. GLOBAL SWEEP (Target Berdasarkan Nama)
         for _, v in pairs(Workspace:GetDescendants()) do
             if not isPlayer(v) then
-                -- Hapus Mirror (ViewportFrame) saja, jangan Mesh panggungnya
-                if v:IsA("ViewportFrame") then
-                    v.Enabled = false
+                -- Menangani part spesifik yang mungkin terlewat di folder
+                if v.Name == "MonitorPart2" or v.Name == "Trunk" or v.Name == "Am" then
+                    v.Transparency = 1
+                    if v:IsA("MeshPart") then v.TextureID = "" end
+                    if v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic end
                 end
                 
-                -- Hanya optimasi material jika itu bukan Tembok/Lantai (agar tidak abu-abu semua)
-                if v:IsA("BasePart") and v.Name == "Part" then -- Biasanya part hiasan namanya cuma "Part"
-                    v.Material = Enum.Material.SmoothPlastic
-                    v.CastShadow = false
-                end
+                -- Mematikan Mirror cadangan
+                if v:IsA("ViewportFrame") then v.Enabled = false end
             end
         end
-        print("CJ Hub: Smart Boost ON - Collision Safe & Avatar Protected.")
+        print("CJ Hub: Absolute Boost ON - Trunk, MonitorPart2, and StageLamp (Am) Hidden.")
     else
         -- KEMBALIKAN SEMUA KE NORMAL
-        for part, data in pairs(originalData) do
-            if part then
-                part.Transparency = data.Transparency
+        for obj, props in pairs(originalData) do
+            if obj and obj.Parent then
+                obj.Transparency = props.Transparency
+                obj.Material = props.Material
             end
         end
         
-        -- Aktifkan kembali mirror & lampu
+        -- Aktifkan kembali GUI & Lampu
         for _, v in pairs(Workspace:GetDescendants()) do
-            if v:IsA("ViewportFrame") or v:IsA("Light") then
+            if v:IsA("SurfaceGui") or v:IsA("ViewportFrame") or v:IsA("Light") or v:IsA("ParticleEmitter") then
                 v.Enabled = true
             end
         end
         
         table.clear(originalData)
-        print("CJ Hub: Smart Boost OFF.")
+        print("CJ Hub: Absolute Boost OFF.")
     end
 end
 
