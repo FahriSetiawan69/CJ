@@ -1,68 +1,85 @@
--- [[ CJ Optimizer - GOD MODE (DATA ACCURATE) ]] --
+-- [[ CJ Optimizer - SMART & SAFE VERSION ]] --
 _G.CJ_Optimizer = {}
 
 local originalData = {}
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 
--- Folder Target Spesifik dari hasil Scan kamu
-local targets = {"HUTAN", "Object", "BOOTH", "Screen", "StageLamp"}
+-- Daftar folder yang akan dihilangkan VISUALNYA saja (Tabrakan tetap ada)
+local heavyFolders = {"HUTAN", "Object", "BOOTH", "Screen", "StageLamp"}
+
+-- Fungsi cek apakah ini bagian dari Player (Baju, Rambut, Kulit)
+local function isPlayer(v)
+    if v:FindFirstAncestorOfClass("Humanoid") or 
+       v:FindFirstAncestorOfClass("Accessory") or 
+       v:FindFirstAncestorOfClass("Shirt") or 
+       v:FindFirstAncestorOfClass("Pants") then
+        return true
+    end
+    return false
+end
 
 function _G.CJ_Optimizer:Toggle(state)
     if state then
-        -- 1. EXTREME LIGHTING & NIGHT MODE
+        -- 1. LIGHTING (Tetap Malam tapi lebih terang sedikit agar tidak suram)
         Lighting.GlobalShadows = false
         Lighting.ClockTime = 0
-        Lighting.Brightness = 0
-        Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 120)
-        
-        -- Matikan Efek Post-Processing
-        for _, effect in pairs(Lighting:GetChildren()) do
-            if effect:IsA("PostProcessEffect") or effect:IsA("BloomEffect") or effect:IsA("BlurEffect") then
-                effect.Enabled = false
-            end
-        end
+        Lighting.Brightness = 1
+        Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
 
-        -- 2. HAPUS FOLDER BERAT (Berdasarkan Scan kamu)
-        for _, name in pairs(targets) do
+        -- 2. SEMBUNYIKAN FOLDER BERAT (TANPA TEMBUS TEMBOK)
+        for _, name in pairs(heavyFolders) do
             local folder = Workspace:FindFirstChild(name)
             if folder then
-                originalData[folder] = {Parent = folder.Parent}
-                folder.Parent = nil -- Menghilangkan Hutan, Sawah, Booth, Lampu, & Mirror Screen
-            end
-        end
-
-        -- 3. OPTIMASI SISA PART (Kecuali Avatar)
-        for _, v in pairs(Workspace:GetDescendants()) do
-            if not v:FindFirstAncestorOfClass("Humanoid") then
-                if v:IsA("BasePart") or v:IsA("MeshPart") or v:IsA("UnionOperation") then
-                    -- Matikan Texture yang tersisa & Paksa Plastik
-                    if v:IsA("MeshPart") then v.TextureID = "" end
-                    v.Material = Enum.Material.SmoothPlastic
-                    v.CastShadow = false
-                    v.Reflectance = 0
-                elseif v:IsA("Decal") or v:IsA("Texture") then
-                    v.Transparency = 1
-                elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Light") then
-                    v.Enabled = false
+                for _, part in pairs(folder:GetDescendants()) do
+                    if part:IsA("BasePart") or part:IsA("MeshPart") then
+                        -- Simpan data asli
+                        originalData[part] = {Transparency = part.Transparency}
+                        -- Bikin transparan (GPU tidak render, tapi Kaki tetap bisa menabrak)
+                        part.Transparency = 1 
+                    elseif part:IsA("Decal") or part:IsA("Texture") then
+                        originalData[part] = {Transparency = part.Transparency}
+                        part.Transparency = 1
+                    elseif part:IsA("Light") or part:IsA("ParticleEmitter") then
+                        part.Enabled = false
+                    end
                 end
             end
         end
-        print("CJ Hub: GOD MODE ON - Hutan, Sawah, Booth, StageLamp & Mirror Dihilangkan.")
-    else
-        -- KEMBALIKAN SEMUA
-        Lighting.GlobalShadows = true
-        Lighting.ClockTime = 12
-        Lighting.Brightness = 2
 
-        -- Munculkan kembali folder yang dihilangkan
-        for folder, data in pairs(originalData) do
-            if folder then folder.Parent = data.Parent end
+        -- 3. OPTIMASI SISANYA (SANGAT HATI-HATI)
+        for _, v in pairs(Workspace:GetDescendants()) do
+            if not isPlayer(v) then
+                -- Hapus Mirror (ViewportFrame) saja, jangan Mesh panggungnya
+                if v:IsA("ViewportFrame") then
+                    v.Enabled = false
+                end
+                
+                -- Hanya optimasi material jika itu bukan Tembok/Lantai (agar tidak abu-abu semua)
+                if v:IsA("BasePart") and v.Name == "Part" then -- Biasanya part hiasan namanya cuma "Part"
+                    v.Material = Enum.Material.SmoothPlastic
+                    v.CastShadow = false
+                end
+            end
+        end
+        print("CJ Hub: Smart Boost ON - Collision Safe & Avatar Protected.")
+    else
+        -- KEMBALIKAN SEMUA KE NORMAL
+        for part, data in pairs(originalData) do
+            if part then
+                part.Transparency = data.Transparency
+            end
         end
         
-        -- Reset material (Simple way: Rejoin atau manual reset jika perlu detail)
+        -- Aktifkan kembali mirror & lampu
+        for _, v in pairs(Workspace:GetDescendants()) do
+            if v:IsA("ViewportFrame") or v:IsA("Light") then
+                v.Enabled = true
+            end
+        end
+        
         table.clear(originalData)
-        print("CJ Hub: GOD MODE OFF - Menunggu Rejoin untuk reset material total.")
+        print("CJ Hub: Smart Boost OFF.")
     end
 end
 
