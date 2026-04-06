@@ -1,96 +1,91 @@
--- [[ CJ Optimizer - ABSOLUTE PRECISION MODE ]] --
+-- [[ CJ Optimizer - PRECISION DELETE + AUTO CLEAN MODE ]] --
 _G.CJ_Optimizer = {}
 
 local originalData = {}
-local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 
--- Folder Target Hasil Scan
-local heavyFolders = {"HUTAN", "Object", "BOOTH", "Screen", "StageLamp"}
+-- Konfigurasi Target
+local WorkspaceTargets = {"HUTAN", "NekoDono", "PANGGUNG", "Screen", "StageLamp"}
+local CleanInterval = 600 -- 600 detik = 10 menit
 
--- Fungsi Proteksi Avatar
-local function isPlayer(v)
-    if v:FindFirstAncestorOfClass("Humanoid") or 
-       v:FindFirstAncestorOfClass("Accessory") or 
-       v:FindFirstAncestorOfClass("Shirt") or 
-       v:FindFirstAncestorOfClass("Pants") then
-        return true
+-- Variable kontrol untuk Loop
+_G.CJ_Optimizer.Active = false
+
+-- // FUNGSI BERSIH-BERSIH RAM //
+local function CleanMemory()
+    local memBefore = math.floor(collectgarbage("count"))
+    collectgarbage("collect")
+    local memAfter = math.floor(collectgarbage("count"))
+    local freed = memBefore - memAfter
+
+    -- Notifikasi Pop-up (Via Fluent)
+    if _G.Fluent then
+        _G.Fluent:Notify({
+            Title = "Auto Clean Berhasil",
+            Content = "Membersihkan " .. tostring(freed) .. " KB data player & cache.",
+            Duration = 5
+        })
     end
-    return false
+    print("[CJ-HUB] Auto Clean: " .. tostring(freed) .. " KB Freed.")
+end
+
+-- // LOOP OTOMATIS //
+local function StartAutoLoop()
+    task.spawn(function()
+        while _G.CJ_Optimizer.Active do
+            task.wait(CleanInterval)
+            if _G.CJ_Optimizer.Active then
+                CleanMemory()
+            end
+        end
+    end)
 end
 
 function _G.CJ_Optimizer:Toggle(state)
+    _G.CJ_Optimizer.Active = state
+    
     if state then
-        -- 1. LIGHTING & ATMOSPHERE
+        -- 1. OPTIMASI LIGHTING
         Lighting.GlobalShadows = false
-        Lighting.ClockTime = 0
-        Lighting.Brightness = 1
-        Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 150)
-
-        -- 2. PEMBERSIHAN TARGET SPESIFIK (Hutan, Mirror, Sawah, StageLamp)
-        for _, name in pairs(heavyFolders) do
-            local folder = Workspace:FindFirstChild(name)
-            if folder then
-                for _, obj in pairs(folder:GetDescendants()) do
-                    -- Sembunyikan Part & MeshPart (Termasuk Trunk, MonitorPart2, dan Am)
-                    if obj:IsA("BasePart") or obj:IsA("MeshPart") then
-                        originalData[obj] = {
-                            Transparency = obj.Transparency,
-                            Material = obj.Material
-                        }
-                        obj.Transparency = 1 -- Visual Hilang
-                        obj.Material = Enum.Material.SmoothPlastic
-                        
-                        -- Kosongkan Tekstur Mesh (Penting untuk Trunk dan Lampu Stage)
-                        if obj:IsA("MeshPart") then
-                            obj.TextureID = ""
-                        end
-                    
-                    -- Matikan Mirror/Layar & GUI
-                    elseif obj:IsA("SurfaceGui") or obj:IsA("BillboardGui") or obj:IsA("ViewportFrame") then
-                        obj.Enabled = false
-                        
-                    -- Matikan Lampu & Partikel
-                    elseif obj:IsA("Light") or obj:IsA("ParticleEmitter") then
-                        obj.Enabled = false
-                    end
-                end
-            end
-        end
-
-        -- 3. GLOBAL SWEEP (Target Berdasarkan Nama)
-        for _, v in pairs(Workspace:GetDescendants()) do
-            if not isPlayer(v) then
-                -- Menangani part spesifik yang mungkin terlewat di folder
-                if v.Name == "MonitorPart2" or v.Name == "Trunk" or v.Name == "Am" then
-                    v.Transparency = 1
-                    if v:IsA("MeshPart") then v.TextureID = "" end
-                    if v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic end
-                end
-                
-                -- Mematikan Mirror cadangan
-                if v:IsA("ViewportFrame") then v.Enabled = false end
-            end
-        end
-        print("CJ Hub: Absolute Boost ON - Trunk, MonitorPart2, and StageLamp (Am) Hidden.")
-    else
-        -- KEMBALIKAN SEMUA KE NORMAL
-        for obj, props in pairs(originalData) do
-            if obj and obj.Parent then
-                obj.Transparency = props.Transparency
-                obj.Material = props.Material
-            end
-        end
         
-        -- Aktifkan kembali GUI & Lampu
-        for _, v in pairs(Workspace:GetDescendants()) do
-            if v:IsA("SurfaceGui") or v:IsA("ViewportFrame") or v:IsA("Light") or v:IsA("ParticleEmitter") then
-                v.Enabled = true
+        -- 2. HAPUS FOLDER TARGET (HUTAN, NEKODONO, DLL)
+        for _, name in pairs(WorkspaceTargets) do
+            local target = Workspace:FindFirstChild(name)
+            if target then
+                originalData[target] = {Parent = target.Parent}
+                target.Parent = nil
+            end
+        end
+
+        -- 3. HAPUS SCREENAVATAR DI PLAYERGUI
+        local PlayerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+        if PlayerGui then
+            local screenAvatar = PlayerGui:FindFirstChild("ScreenAvatar")
+            if screenAvatar then
+                originalData[screenAvatar] = {Parent = screenAvatar.Parent}
+                screenAvatar.Parent = nil
+            end
+        end
+
+        -- 4. JALANKAN AUTO CLEAN PER 10 MENIT
+        CleanMemory() -- Jalankan sekali saat pertama kali ON
+        StartAutoLoop()
+
+        print("CJ Hub: Extreme Boost & Auto Clean (10m) Active!")
+    else
+        -- 5. KEMBALIKAN SEMUA
+        Lighting.GlobalShadows = true
+        
+        for obj, data in pairs(originalData) do
+            if obj then
+                obj.Parent = data.Parent
             end
         end
         
         table.clear(originalData)
-        print("CJ Hub: Absolute Boost OFF.")
+        print("CJ Hub: Boost Off. Auto Clean Stopped.")
     end
 end
 
